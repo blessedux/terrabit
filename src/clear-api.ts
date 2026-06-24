@@ -36,7 +36,18 @@ async function clearGraphQL<T>(
     body: JSON.stringify({ query, variables }),
   });
 
-  const payload = (await response.json()) as GraphQLPayload<T>;
+  const raw = await response.text();
+  let payload: GraphQLPayload<T>;
+  try {
+    payload = JSON.parse(raw) as GraphQLPayload<T>;
+  } catch {
+    const preview = raw.trim().slice(0, 80);
+    throw new Error(
+      response.ok
+        ? "CLEAR API returned non-JSON response"
+        : `CLEAR API ${response.status}: ${preview || "request failed"}`,
+    );
+  }
 
   if (!response.ok) {
     const message =

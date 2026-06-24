@@ -163,7 +163,7 @@ Static layers (population, health) stay on object storage. **CLEAR supplies the 
 
 - [x] `.env.local` in `.gitignore`
 - [x] `CLEAR_API_KEY` has no `VITE_` prefix (not bundled to browser)
-- [ ] Production: backend proxy or edge function holds the key
+- [x] Production: Vercel serverless proxy at `/api/clear/graphql` holds the key
 - [ ] Rotate key if it was ever committed or shared
 
 ---
@@ -178,5 +178,6 @@ Static layers (population, health) stay on object storage. **CLEAR supplies the 
 | `CLEAR_API_KEY not set` | Create `.env.local`; run with `bun run` (auto-loads env) |
 | GraphQL field error | Field changed — check live schema in GraphQL Sandbox |
 | Empty `eventsByLocation` | Valid — may be no events for that location right now |
+| `/api/clear/graphql` 404 on Vercel | Deploy includes `api/clear/graphql.ts` + `vercel.json`; set `CLEAR_API_KEY` in Vercel project env and redeploy |
 
 **Interactive explorer:** GraphQL Sandbox linked from the [CLEAR docs](https://api.clearinitiative.io/docs#guide).
