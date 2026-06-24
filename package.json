@@ -1,7 +1,8 @@
 {
   "dependencies": {
     "@duckdb/duckdb-wasm": "^1.32.0",
-    "maplibre-gl": "^5.22.0"
+    "maplibre-gl": "^5.22.0",
+    "pmtiles": "^4.4.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
@@ -9,14 +10,18 @@
     "typescript": "^5.9.3",
     "vite": "^8.0.3"
   },
-  "name": "terrabit",
+  "optionalDependencies": {
+    "@rolldown/binding-darwin-arm64": "^1.1.3"
+  },
+  "name": "sentryfi-crisis-mesh",
   "scripts": {
     "build": "vite build",
     "check": "biome check src/",
     "dev": "vite",
     "format": "biome check --write src/",
     "lint": "biome lint src/",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:clear": "bun run scripts/test-clear-api.ts"
   },
   "type": "module",
   "version": "0.0.1"

@@ -5,6 +5,8 @@ dist/
 output/
 .venv/
 .ruff_cache/
+.env.local
+.env.*.local
 
 # Claude Code
 .claude/

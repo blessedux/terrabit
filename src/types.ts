@@ -5,64 +5,72 @@ export type BBox = {
   north: number;
 };
 
-export type ManifestRow = {
+export type AoiEntry = {
+  id: number;
+  bbox: BBox;
+  polygon?: [number, number][];
+};
+
+export type LayerType =
+  | "demographics"
+  | "roads"
+  | "health"
+  | "admin"
+  | "security"
+  | "population";
+
+export type StaticGeoShard = {
+  shard_id: string;
+  geohash: string;
+  bbox: [number, number, number, number];
   path: string;
-  rows: number;
+  row_count: number;
+  layer: LayerType;
+  updated_at: string;
+};
+
+export type ManifestRow = {
+  shard_id: string;
+  path: string;
+  row_count: number;
   xmin: number;
   ymin: number;
   xmax: number;
   ymax: number;
-  year?: string;
+  layer: LayerType;
+  geohash?: string;
+  updated_at?: string;
 };
 
-export type PositivePoint = {
-  id: number;
-  lat: number;
-  lng: number;
-  /** Embedding fetched on-the-fly for exemplars outside the current AOI. */
-  embedding?: Uint8Array;
-  /** chips_id for deduplication of external exemplars. */
-  chips_id?: string;
+export type HumanitarianFeature = {
+  id: string;
+  layer: LayerType;
+  geometry: GeoJSON.Geometry;
+  properties: Record<string, unknown>;
+};
+
+export type LayerVisibility = Record<LayerType, boolean>;
+
+export type ViewMode = "topk" | "heatmap" | "outlier" | "threshold" | "surprise" | "gradient";
+
+export type RankedRow = {
+  id: string;
+  bbox: BBox;
+  score: number;
+  layer: LayerType;
+  properties: Record<string, unknown>;
 };
 
 export type CandidateRow = {
-  chips_id: string;
+  id: string;
   bbox: BBox;
-  embedding: Uint8Array;
+  layer: LayerType;
+  properties: Record<string, unknown>;
   shard_path: string;
 };
 
-export type PositiveMatch = {
-  pointId: number;
-  candidate: CandidateRow;
-};
-
-export type RankedRow = CandidateRow & {
-  score: number;
-};
-
-export type NegativePoint = {
-  id: number;
-  lat: number;
-  lng: number;
-  embedding?: Uint8Array;
-  chips_id?: string;
-};
-
-export type ViewMode =
-  | "topk"
-  | "heatmap"
-  | "outlier"
-  | "threshold"
-  | "surprise"
-  | "gradient";
-
-export type CombineMethod = "mean" | "and" | "or" | "xor";
-
-export type AoiEntry = {
-  id: number;
-  bbox: BBox;
-  /** Closed polygon ring [lng, lat][] including the repeated closing vertex.
-   *  Present when drawn in polygon mode; absent for rectangle/preset draws. */
-  polygon?: [number, number][];
+export type FilterState = {
+  minPopulation?: number;
+  minVulnerability?: number;
+  layers: LayerVisibility;
 };

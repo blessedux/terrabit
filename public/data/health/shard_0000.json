@@ -1,0 +1,87 @@
+[
+  {
+    "id": "health_0000",
+    "bbox": {
+      "xmin": 69.169,
+      "ymin": 34.519000000000005,
+      "xmax": 69.171,
+      "ymax": 34.521
+    },
+    "layer": "health",
+    "name": "Kabul Hospital",
+    "facility_type": "hospital",
+    "capacity": 164,
+    "lat": 34.52,
+    "lng": 69.17,
+    "geohash": "tw1hqh0",
+    "geometry": null
+  },
+  {
+    "id": "health_0001",
+    "bbox": {
+      "xmin": 62.199000000000005,
+      "ymin": 34.349000000000004,
+      "xmax": 62.201,
+      "ymax": 34.351
+    },
+    "layer": "health",
+    "name": "Herat Clinic",
+    "facility_type": "clinic",
+    "capacity": 83,
+    "lat": 34.35,
+    "lng": 62.2,
+    "geohash": "tqh5rmh",
+    "geometry": null
+  },
+  {
+    "id": "health_0002",
+    "bbox": {
+      "xmin": 65.699,
+      "ymin": 31.608999999999998,
+      "xmax": 65.70100000000001,
+      "ymax": 31.611
+    },
+    "layer": "health",
+    "name": "Kandahar Health Center",
+    "facility_type": "health_center",
+    "capacity": 208,
+    "lat": 31.61,
+    "lng": 65.7,
+    "geohash": "tmwez43",
+    "geometry": null
+  },
+  {
+    "id": "health_0003",
+    "bbox": {
+      "xmin": 67.109,
+      "ymin": 36.709,
+      "xmax": 67.111,
+      "ymax": 36.711
+    },
+    "layer": "health",
+    "name": "Mazar-i-Sharif Hospital",
+    "facility_type": "hospital",
+    "capacity": 219,
+    "lat": 36.71,
+    "lng": 67.11,
+    "geohash": "tqx8z4u",
+    "geometry": null
+  },
+  {
+    "id": "health_0004",
+    "bbox": {
+      "xmin": 70.449,
+      "ymin": 34.429,
+      "xmax": 70.45100000000001,
+      "ymax": 34.431
+    },
+    "layer": "health",
+    "name": "Jalalabad Clinic",
+    "facility_type": "clinic",
+    "capacity": 146,
+    "lat": 34.43,
+    "lng": 70.45,
+    "geohash": "tw45g5u",
+    "geometry": null
+  }
+]

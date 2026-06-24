@@ -3,6 +3,7 @@
 import maplibregl from "maplibre-gl/dist/maplibre-gl-dev.js";
 import "maplibre-gl/dist/maplibre-gl.css";
 
+import type { ClearMapMarker } from "./clear-api";
 import type {
   AoiEntry,
   BBox,
@@ -13,11 +14,20 @@ import type {
   ViewMode,
 } from "./types";
 import { centroid, interpolatePlasma } from "./util";
+import {
+  EARTH_ROTATION_DEG_PER_MS,
+  GLOBE_INTRO,
+  REGIONS,
+  type FocusRegion,
+} from "./regions";
 
 const SENTINEL_TILES =
   "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg";
 const SENTINEL_ATTRIBUTION =
   'Sentinel-2 cloudless — <a href="https://s2maps.eu" target="_blank" rel="noreferrer">s2maps.eu</a> by <a href="https://eox.at" target="_blank" rel="noreferrer">EOX</a> (Copernicus Sentinel data 2024)';
+
+const DRAWING_TIMEOUT = 300;
+const REGION_BOUNDS_MAX_ZOOM = 5;
 
 export type MapCallbacks = {
   onDrawComplete: (result: {
@@ -63,16 +73,23 @@ export class GlobeMap {
   };
   private styleReady = false;
   private pendingRender: (() => void)[] = [];
+  private rotationFrame: number | null = null;
+  private rotationPaused = false;
+  private userInteracting = false;
+  private hasUserInteracted = false;
+  private activeRegion: FocusRegion = "sudan";
 
   constructor(container: HTMLElement, cb: MapCallbacks) {
     this.cb = cb;
     this.map = new maplibregl.Map({
       container,
       style: this.buildStyle(),
-      center: [-95, 38],
-      zoom: 1.8,
-      minZoom: 0.5,
+      center: GLOBE_INTRO.startCenter,
+      zoom: GLOBE_INTRO.startZoom,
+      minZoom: 0.35,
       maxZoom: 14,
+      pitch: 0,
+      bearing: 0,
       attributionControl: false,
       dragRotate: true,
       pitchWithRotate: true,
@@ -102,8 +119,43 @@ export class GlobeMap {
       this.addLayers();
       this.styleReady = true;
       this.map.resize();
-      this.easeIntro();
+      this.playIntro();
       for (const fn of this.pendingRender.splice(0)) fn();
+    });
+
+    this.map.on("dragstart", () => {
+      this.userInteracting = true;
+      this.hasUserInteracted = true;
+      this.pauseRotation();
+    });
+    this.map.on("zoomstart", () => {
+      this.userInteracting = true;
+      this.hasUserInteracted = true;
+      this.pauseRotation();
+    });
+    this.map.on("rotatestart", () => {
+      this.userInteracting = true;
+      this.hasUserInteracted = true;
+      this.pauseRotation();
+    });
+    this.map.on("moveend", () => {
+      if (this.userInteracting) {
+        this.userInteracting = false;
+        if (!this.hasUserInteracted) {
+          window.setTimeout(() => this.resumeRotation(), 2500);
+        } else {
+          this.stopRotation();
+        }
+      }
+    });
+    this.map.on("zoomend", () => {
+      const zoom = this.map.getZoom();
+      if (zoom < REGION_BOUNDS_MAX_ZOOM) {
+        this.map.setMaxBounds(null);
+      }
+      if (!this.draw.armed) {
+        this.map.dragPan.enable();
+      }
     });
 
     // Keep the map sized to its container — catches late layout shifts.
@@ -335,6 +387,12 @@ export class GlobeMap {
       "preview",
       "draft",
       "poly-draft",
+      "clear-signals",
+      "clear-events",
+      "clear-alerts",
+      "access-origin",
+      "access-destination",
+      "access-route",
     ]) {
       this.map.addSource(id, { type: "geojson", data: empty as any });
     }
@@ -430,6 +488,99 @@ export class GlobeMap {
       paint: { "line-color": "#c74633", "line-width": 1.6 },
     });
 
+    // CLEAR API markers (signals / events / alerts)
+    const clearLayer = (
+      id: string,
+      source: string,
+      color: string,
+      radius: number,
+    ) => {
+      this.map.addLayer({
+        id: `${id}-halo`,
+        type: "circle",
+        source,
+        paint: {
+          "circle-radius": radius + 6,
+          "circle-color": color,
+          "circle-opacity": 0.22,
+        },
+      });
+      this.map.addLayer({
+        id,
+        type: "circle",
+        source,
+        paint: {
+          "circle-radius": [
+            "interpolate",
+            ["linear"],
+            ["coalesce", ["get", "severity"], 3],
+            1,
+            radius - 2,
+            5,
+            radius + 4,
+          ],
+          "circle-color": color,
+          "circle-stroke-color": "#f3ecd8",
+          "circle-stroke-width": 1.5,
+        },
+      });
+    };
+
+    clearLayer("clear-signals", "clear-signals", "#60a5fa", 5);
+    clearLayer("clear-events", "clear-events", "#f97316", 6);
+    clearLayer("clear-alerts", "clear-alerts", "#ef4444", 7);
+
+    // Only alerts show popup on click; events are shown in side panel
+    this.map.on("click", "clear-alerts", (e) =>
+      this.showClearPopup(e, "clear-alerts"),
+    );
+    this.map.on("click", "clear-signals", (e) =>
+      this.showClearPopup(e, "clear-signals"),
+    );
+    
+    for (const layer of ["clear-alerts", "clear-events", "clear-signals"]) {
+      this.map.on("mouseenter", layer, () => {
+        this.map.getCanvas().style.cursor = "pointer";
+      });
+      this.map.on("mouseleave", layer, () => {
+        this.map.getCanvas().style.cursor = "";
+      });
+    }
+
+    // Roads & Access routing layers
+    this.map.addLayer({
+      id: "access-route",
+      type: "line",
+      source: "access-route",
+      paint: {
+        "line-color": "#d0542c",
+        "line-width": 5,
+        "line-opacity": 0.9,
+      },
+    });
+    this.map.addLayer({
+      id: "access-origin",
+      type: "circle",
+      source: "access-origin",
+      paint: {
+        "circle-radius": 8,
+        "circle-color": "#22c55e",
+        "circle-stroke-color": "#f3ecd8",
+        "circle-stroke-width": 2,
+      },
+    });
+    this.map.addLayer({
+      id: "access-destination",
+      type: "circle",
+      source: "access-destination",
+      paint: {
+        "circle-radius": 8,
+        "circle-color": "#d0542c",
+        "circle-stroke-color": "#f3ecd8",
+        "circle-stroke-width": 2,
+      },
+    });
+
     // Preview (hover) bbox
     this.map.addLayer({
       id: "preview-line",
@@ -489,13 +640,107 @@ export class GlobeMap {
     });
   }
 
-  private easeIntro(): void {
-    this.map.easeTo({
-      center: [-95, 38],
-      zoom: 2.2,
-      duration: 2600,
+  private playIntro(): void {
+    this.pauseRotation();
+    this.map.jumpTo({
+      center: GLOBE_INTRO.startCenter,
+      zoom: GLOBE_INTRO.startZoom,
+      pitch: 0,
+      bearing: 0,
+    });
+
+    this.map.flyTo({
+      center: GLOBE_INTRO.endCenter,
+      zoom: GLOBE_INTRO.endZoom,
+      pitch: 0,
+      bearing: 0,
+      duration: GLOBE_INTRO.durationMs,
+      essential: true,
+      curve: 1.1,
+    });
+
+    this.map.once("moveend", () => {
+      this.activeRegion = "sudan";
+      if (!this.hasUserInteracted) {
+        this.resumeRotation();
+      }
+    });
+  }
+
+  private tickRotation = (timestamp: number): void => {
+    if (this.rotationFrame === null) return;
+
+    if (!this.rotationPaused && !this.userInteracting && !this.map.isMoving()) {
+      const center = this.map.getCenter();
+      const zoom = this.map.getZoom();
+      if (zoom <= 4.5) {
+        const dt = this._lastRotationTs ? timestamp - this._lastRotationTs : 16;
+        const lng =
+          center.lng - EARTH_ROTATION_DEG_PER_MS * dt * (zoom < 2 ? 1.4 : 1);
+        this.map.setCenter([lng, center.lat]);
+      }
+    }
+    this._lastRotationTs = timestamp;
+    this.rotationFrame = requestAnimationFrame(this.tickRotation);
+  };
+
+  private _lastRotationTs = 0;
+
+  startRotation(): void {
+    if (this.rotationFrame !== null) return;
+    this.rotationPaused = false;
+    this.rotationFrame = requestAnimationFrame(this.tickRotation);
+  }
+
+  pauseRotation(): void {
+    this.rotationPaused = true;
+  }
+
+  resumeRotation(): void {
+    this.rotationPaused = false;
+    if (this.rotationFrame === null) {
+      this.startRotation();
+    }
+  }
+
+  stopRotation(): void {
+    this.rotationPaused = true;
+    if (this.rotationFrame !== null) {
+      cancelAnimationFrame(this.rotationFrame);
+      this.rotationFrame = null;
+    }
+  }
+
+  focusRegion(region: FocusRegion, opts: { zoom?: number } = {}): void {
+    this.activeRegion = region;
+    const cfg = REGIONS[region];
+    this.pauseRotation();
+    this.map.setMaxBounds(null);
+    this.map.flyTo({
+      center: cfg.center,
+      zoom: opts.zoom ?? cfg.focusZoom,
+      pitch: 0,
+      duration: 2200,
       essential: true,
     });
+    this.map.once("moveend", () => {
+      const zoom = this.map.getZoom();
+      if (zoom >= REGION_BOUNDS_MAX_ZOOM) {
+        this.map.setMaxBounds([
+          cfg.bounds.west,
+          cfg.bounds.south,
+          cfg.bounds.east,
+          cfg.bounds.north,
+        ]);
+      }
+      if (!this.hasUserInteracted) {
+        window.setTimeout(() => this.resumeRotation(), 2000);
+      }
+    });
+  }
+
+  getActiveRegion(): FocusRegion {
+    return this.activeRegion;
   }
 
   private whenReady(fn: () => void): void {
@@ -693,6 +938,193 @@ export class GlobeMap {
         features: result ? [bboxToPolygon(result.bbox)] : [],
       });
     });
+  }
+
+  setClearMarkers(markers: ClearMapMarker[]): void {
+    this.whenReady(() => {
+      const byKind = {
+        signal: markers.filter((m) => m.kind === "signal"),
+        event: markers.filter((m) => m.kind === "event"),
+        alert: markers.filter((m) => m.kind === "alert"),
+      };
+
+      const toFeatures = (items: ClearMapMarker[]) =>
+        items.map((m) => ({
+          type: "Feature" as const,
+          geometry: {
+            type: "Point" as const,
+            coordinates: [m.lng, m.lat],
+          },
+          properties: {
+            id: m.id,
+            kind: m.kind,
+            title: m.title,
+            severity: m.severity,
+            status: m.status ?? "",
+            locationName: m.locationName ?? "",
+            sourceName: m.sourceName ?? "",
+          },
+        }));
+
+      const sources: Array<[string, ClearMapMarker[]]> = [
+        ["clear-signals", byKind.signal],
+        ["clear-events", byKind.event],
+        ["clear-alerts", byKind.alert],
+      ];
+
+      for (const [sourceId, items] of sources) {
+        const src = this.map.getSource(sourceId) as maplibregl.GeoJSONSource;
+        src?.setData({
+          type: "FeatureCollection",
+          features: toFeatures(items),
+        });
+      }
+    });
+  }
+
+  setClearLayerVisibility(visibility: {
+    signals: boolean;
+    events: boolean;
+    alerts: boolean;
+  }): void {
+    this.whenReady(() => {
+      const layers: Array<[keyof typeof visibility, string]> = [
+        ["signals", "clear-signals"],
+        ["events", "clear-events"],
+        ["alerts", "clear-alerts"],
+      ];
+
+      for (const [key, baseId] of layers) {
+        const vis = visibility[key] ? "visible" : "none";
+        for (const id of [baseId, `${baseId}-halo`]) {
+          if (this.map.getLayer(id)) {
+            this.map.setLayoutProperty(id, "visibility", vis);
+          }
+        }
+      }
+    });
+  }
+
+  private showClearPopup(
+    e: maplibregl.MapMouseEvent & {
+      features?: maplibregl.MapGeoJSONFeature[];
+    },
+    layerId: string,
+  ): void {
+    const feature = e.features?.[0];
+    if (!feature) return;
+
+    const props = feature.properties ?? {};
+    const kind = String(props.kind ?? layerId.replace("clear-", ""));
+    const title = String(props.title ?? "CLEAR item");
+    const severity = props.severity ? `Severity ${props.severity}` : "";
+    const location = props.locationName
+      ? String(props.locationName)
+      : "";
+    const status = props.status ? `Status: ${props.status}` : "";
+    const source = props.sourceName ? `Source: ${props.sourceName}` : "";
+
+    const html = `
+      <div class="clear-popup-card">
+        <span class="clear-popup-kind">${kind}</span>
+        <strong class="clear-popup-title">${title}</strong>
+        ${severity ? `<span class="clear-popup-sev">${severity}</span>` : ""}
+        ${location ? `<span class="clear-popup-row">${location}</span>` : ""}
+        ${status ? `<span class="clear-popup-row">${status}</span>` : ""}
+        ${source ? `<span class="clear-popup-row">${source}</span>` : ""}
+      </div>
+    `;
+
+    new maplibregl.Popup({
+      closeButton: true,
+      maxWidth: "300px",
+      className: "clear-glass-popup",
+    })
+      .setLngLat(e.lngLat)
+      .setHTML(html)
+      .addTo(this.map);
+  }
+
+  setAccessRoute(geojson: GeoJSON.Feature | null): void {
+    this.whenReady(() => {
+      const src = this.map.getSource("access-route") as maplibregl.GeoJSONSource;
+      if (geojson) {
+        src?.setData({
+          type: "FeatureCollection",
+          features: [geojson],
+        });
+      } else {
+        src?.setData({
+          type: "FeatureCollection",
+          features: [],
+        });
+      }
+    });
+  }
+
+  setRouteEndpoints(
+    origin: { lng: number; lat: number } | null,
+    destination: { lng: number; lat: number } | null,
+  ): void {
+    this.whenReady(() => {
+      const originSrc = this.map.getSource("access-origin") as maplibregl.GeoJSONSource;
+      const destSrc = this.map.getSource("access-destination") as maplibregl.GeoJSONSource;
+
+      if (origin) {
+        originSrc?.setData({
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [origin.lng, origin.lat],
+              },
+              properties: {},
+            },
+          ],
+        });
+      } else {
+        originSrc?.setData({ type: "FeatureCollection", features: [] });
+      }
+
+      if (destination) {
+        destSrc?.setData({
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [destination.lng, destination.lat],
+              },
+              properties: {},
+            },
+          ],
+        });
+      } else {
+        destSrc?.setData({ type: "FeatureCollection", features: [] });
+      }
+    });
+  }
+
+  setMapPickMode(
+    enabled: boolean,
+    onPick?: (lng: number, lat: number) => void,
+  ): void {
+    if (enabled) {
+      this.map.getCanvas().style.cursor = "crosshair";
+      const handler = (e: maplibregl.MapMouseEvent) => {
+        if (onPick) {
+          onPick(e.lngLat.lng, e.lngLat.lat);
+        }
+        this.map.off("click", handler);
+        this.map.getCanvas().style.cursor = "";
+      };
+      this.map.on("click", handler);
+    } else {
+      this.map.getCanvas().style.cursor = "";
+    }
   }
 
   flyToBBox(bbox: BBox, opts: { zoom?: number } = {}): void {

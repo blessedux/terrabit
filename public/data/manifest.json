@@ -1,0 +1,62 @@
+[
+  {
+    "shard_id": "shard_0000",
+    "path": "population/shard_0000.parquet",
+    "row_count": 1000,
+    "xmin": 60.5,
+    "ymin": 29.4,
+    "xmax": 62.5,
+    "ymax": 31.4,
+    "layer": "population",
+    "geohash": "tm7sz",
+    "updated_at": "2026-06-22T16:01:24.183Z"
+  },
+  {
+    "shard_id": "shard_0001",
+    "path": "population/shard_0001.parquet",
+    "row_count": 1000,
+    "xmin": 60.5,
+    "ymin": 31.4,
+    "xmax": 62.5,
+    "ymax": 33.4,
+    "layer": "population",
+    "geohash": "tmg8r",
+    "updated_at": "2026-06-22T16:01:24.184Z"
+  },
+  {
+    "shard_id": "shard_0002",
+    "path": "population/shard_0002.parquet",
+    "row_count": 1000,
+    "xmin": 60.5,
+    "ymin": 33.4,
+    "xmax": 62.5,
+    "ymax": 35.4,
+    "layer": "population",
+    "geohash": "tq5ex",
+    "updated_at": "2026-06-22T16:01:24.184Z"
+  },
+  {
+    "shard_id": "shard_0003",
+    "path": "population/shard_0003.parquet",
+    "row_count": 1000,
+    "xmin": 60.5,
+    "ymin": 35.4,
+    "xmax": 62.5,
+    "ymax": 37.4,
+    "layer": "population",
+    "geohash": "tq7xp",
+    "updated_at": "2026-06-22T16:01:24.184Z"
+  },
+  {
+    "shard_id": "shard_0004",
+    "path": "population/shard_0004.parquet",
+    "row_count": 1000,
+    "xmin": 60.5,
+    "ymin": 37.4,
+    "xmax": 62.5,
+    "ymax": 38.5,
+    "layer": "population",
+    "geohash": "tqexz",
+    "updated_at": "2026-06-22T16:01:24.184Z"
+  }
+]

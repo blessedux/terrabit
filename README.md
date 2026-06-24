@@ -1,21 +1,23 @@
-# terrabit
+# SentryFi Crisis Mesh
 
-Binary earth embedding retrieval — find every satellite patch on Earth that looks like a location you point at.
-
-[**Live demo**](https://isaac.earth/terrabit)
+Fast humanitarian crisis intelligence map for Afghanistan — process live crisis signals in seconds using browser-side spatial analysis.
 
 ## What it does
 
-terrabit searches a global index of ~5M Sentinel-2 satellite image chips using compact binary embeddings ([Clay v1.5](https://clay.earth)). You draw a region, click an exemplar, and the app ranks every patch by Hamming distance — entirely in-browser using DuckDB-WASM and Web Workers.
+SentryFi provides NGO analysts with a lightweight, intuitive map interface for live humanitarian data. Built on TerraBit's architecture, it uses DuckDB-WASM for browser-side spatial filtering, MapLibre GL JS for rendering, and static GeoParquet/PMTiles for context layers.
 
-**View modes:** Top-K ranked list, continuous heatmap, distance cutoff, outlier detection, spatial surprise, and similarity gradient (edge detection).
+**Current features:**
+- Afghanistan-focused map with admin boundaries
+- Population density and health facility layers
+- Browser-side spatial queries on GeoParquet shards
+- AOI drawing tools for region analysis
+- GeoParquet export for offline analysis
 
-**Key features:**
-- Globe-wide exemplar placement — click anywhere on Earth, inside or outside your region
-- Positive and negative exemplars with combine methods (mean, AND, OR, XOR)
-- Invert search to find visual opposites
-- GeoParquet export for QGIS, DuckDB, or GeoPandas
-- Interactive tutorial with live demo
+**Planned features:**
+- Live crisis signal stream (WebSocket/SSE)
+- deck.gl visualization layers (heatmaps, hexbins, arcs)
+- Analyst verification workflow
+- Multi-source crisis intelligence
 
 ## Architecture
 
@@ -23,45 +25,67 @@ terrabit searches a global index of ~5M Sentinel-2 satellite image chips using c
 src/
 ├── main.ts          App orchestration, state, event wiring
 ├── map.ts           MapLibre globe, drawing, layers
-├── scoring-worker.ts  Web Worker: Hamming distance, outlier, surprise, gradient
+├── scoring-worker.ts  Web Worker: humanitarian ranking and scoring
 ├── db.ts            DuckDB-WASM init, spatial queries, shard loading
 ├── geocoder.ts      Nominatim search, coordinate parsing
 ├── export.ts        GeoParquet writer (Thrift footer injection)
-├── tutorial.ts      Interactive walkthrough system
-├── presets.ts       Curated AOI regions and discovery points
+├── presets.ts       Afghanistan province AOIs
+├── filters.ts       Layer toggles and threshold filters
+├── config.ts        Data URLs and layer configuration
 ├── types.ts         Shared type definitions
 ├── util.ts          Geometry helpers, color interpolation
-└── styles.css       Full UI stylesheet (warm espresso palette)
+└── styles.css       Full UI stylesheet
 ```
 
-**Stack:** TypeScript, Vite, MapLibre GL JS, DuckDB-WASM, Web Workers. No framework — vanilla DOM.
+**Stack:** TypeScript, Vite, MapLibre GL JS, DuckDB-WASM, Web Workers, PMTiles. No framework — vanilla DOM.
 
-**Data:** Parquet shards hosted on [Source Cooperative](https://source.coop/repositories/geospatialml/terrabit). Each chip has a 256-bit binary embedding from Clay v1.5 and a bounding box. The manifest is queried with DuckDB's spatial extension to find intersecting shards.
+**Data:** Static humanitarian layers (admin boundaries, population density, health facilities) served as GeoParquet shards and PMTiles. The manifest is queried with DuckDB's spatial extension to load only intersecting shards for the visible AOI.
 
 ## Quick start
 
 ```bash
-# requires Bun (https://bun.sh)
+# Install dependencies
 bun install
+
+# Generate sample data
+bun run scripts/build-population.ts
+bun run scripts/build-health.ts
+bun run scripts/build-manifest.ts
+
+# Start dev server
 bun run dev       # http://localhost:5173
+
+# Build for production
 bun run build     # production build → dist/
 bun run check     # biome lint + format check
 ```
 
-Or with Make:
+## Development Status
 
-```bash
-make dev          # install + dev server
-make build        # install + production build
-make check        # install + lint
-```
+**Phase 1-2 Complete:**
+- ✅ TerraBit-based map shell with Afghanistan defaults
+- ✅ Humanitarian data types and layer system
+- ✅ DuckDB-WASM manifest-based shard loading
+- ✅ Layer toggle controls
+- ✅ Afghanistan province presets
+- ✅ Stub data pipeline (population, health facilities)
+- ✅ IndexedDB caching infrastructure
+
+**Next (Phase 3-5):**
+- Live crisis signal stream (WebSocket/SSE)
+- deck.gl visualization layers (heatmaps, hexbins)
+- Real data sources (HDX, WorldPop, OSM)
+- Analyst verification workflow
+- PostGIS/Supabase backend
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Credits
+
+Built on [TerraBit](https://github.com/blessedux/terrabit) by Isaac Corley
+
 ## License
 
-[Apache 2.0](LICENSE) — Copyright 2025 Isaac Corley
-
-Created by [Isaac Corley](https://isaac.earth)
+[Apache 2.0](LICENSE)
